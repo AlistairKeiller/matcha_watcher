@@ -46,14 +46,22 @@ pub async fn unsubscribe(ctx: Context<'_>) -> Result<(), Error> {
 }
 
 pub async fn fetch_products(site: &Site) -> Result<HashSet<Matcha>, Error> {
-    let res = reqwest::get(site.url).await?.error_for_status()?;
+    let client = reqwest::Client::new();
+    let res = client
+        .get(site.url)
+        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+        .header("Accept-Language", "en-US,en;q=0.9")
+        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+        .send()
+        .await?
+        .error_for_status()?;
     let document = scraper::Html::parse_document(&res.text().await?);
     let product_cards = document
         .select(&site.product_card_selector)
         .filter(|element| {
             site.out_of_stock_filter
                 .as_ref()
-                .is_none_or(|filter| element.select(filter).next().is_some())
+                .is_none_or(|filter| element.select(filter).next().is_none())
         });
     let mut products = HashSet::new();
     for product_card in product_cards {
