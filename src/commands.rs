@@ -89,8 +89,8 @@ pub async fn watch_matcha(ctx: serenity::all::Context, data: Arc<RwLock<Data>>) 
                 info!("No changes found on site {}", site.url);
                 continue;
             }
-            let matchas_in_stock = site.matchas_in_stock.read().await;
-            let added = products.difference(&*matchas_in_stock);
+            let matchas_in_stock = site.matchas_in_stock.read().await.clone();
+            let added = products.difference(&matchas_in_stock);
             let removed = matchas_in_stock.difference(&products);
             *site.matchas_in_stock.write().await = products.clone();
             info!(

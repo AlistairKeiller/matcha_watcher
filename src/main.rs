@@ -51,6 +51,12 @@ async fn main() -> Result<(), Error> {
             Box::pin(async move {
                 tracing::info!("Logged in as {}", _ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                {
+                    let mut data = ctx.data.write().await;
+                    data.insert::<Data>(Arc::new(RwLock::new(Data {
+                        subscribers: RwLock::new(HashSet::new()),
+                    })));
+                }
                 tokio::spawn(commands::watch_matcha(
                     ctx.clone(),
                     ctx.data.read().await.get::<Data>().unwrap().clone(),
@@ -66,8 +72,7 @@ async fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
     let token =
         var("DISCORD_TOKEN").map_err(|e| format!("Missing `DISCORD_TOKEN` env var: {}", e))?;
-    let intents =
-        serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
+    let intents = serenity::GatewayIntents::non_privileged();
 
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
