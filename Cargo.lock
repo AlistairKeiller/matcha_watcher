@@ -1174,6 +1174,7 @@ dependencies = [
  "scraper",
  "serenity",
  "tokio",
+ "tracing",
  "tracing-subscriber",
 ]
 

@@ -1,35 +1,42 @@
 mod commands;
+mod config;
 
-use ::serenity::all::UserId;
+use ::serenity::prelude::TypeMapKey;
 use poise::{FrameworkOptions, serenity_prelude as serenity};
-use std::{collections::HashSet, env::var, sync::Mutex};
+use serenity::all::UserId;
+use std::{collections::HashSet, env::var, sync::Arc};
+use tokio::sync::RwLock;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
-    subscribers: Mutex<HashSet<UserId>>,
+    subscribers: RwLock<HashSet<UserId>>,
+}
+
+impl TypeMapKey for Data {
+    type Value = Arc<RwLock<Data>>;
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt::init();
 
     let options: FrameworkOptions<Data, Error> = poise::FrameworkOptions {
         commands: vec![commands::subscribe(), commands::unsubscribe()],
         pre_command: |ctx| {
             Box::pin(async move {
-                println!("Executing command {}...", ctx.command().qualified_name);
+                tracing::info!("Executing command {}...", ctx.command().qualified_name);
             })
         },
         post_command: |ctx| {
             Box::pin(async move {
-                println!("Executed command {}!", ctx.command().qualified_name);
+                tracing::info!("Executed command {}!", ctx.command().qualified_name);
             })
         },
         event_handler: |_ctx, event, _framework, _data| {
             Box::pin(async move {
-                println!(
+                tracing::info!(
                     "Got an event in event handler: {:?}",
                     event.snake_case_name()
                 );
@@ -42,25 +49,31 @@ async fn main() {
     let framework = poise::Framework::builder()
         .setup(move |ctx, _ready, framework| {
             Box::pin(async move {
-                println!("Logged in as {}", _ready.user.name);
+                tracing::info!("Logged in as {}", _ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                tokio::spawn(commands::watch_matcha(
+                    ctx.clone(),
+                    ctx.data.read().await.get::<Data>().unwrap().clone(),
+                ));
                 Ok(Data {
-                    subscribers: Mutex::new(HashSet::new()),
+                    subscribers: RwLock::new(HashSet::new()),
                 })
             })
         })
         .options(options)
         .build();
 
-    dotenv::dotenv().expect("Failed to load .env file");
-    let token = var("DISCORD_TOKEN")
-        .expect("Missing `DISCORD_TOKEN` env var, see README for more information.");
+    dotenv::dotenv().ok();
+    let token =
+        var("DISCORD_TOKEN").map_err(|e| format!("Missing `DISCORD_TOKEN` env var: {}", e))?;
     let intents =
         serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
-    let client = serenity::ClientBuilder::new(token, intents)
+    let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
-        .await;
+        .await?;
 
-    client.unwrap().start().await.unwrap()
+    client.start().await?;
+
+    Ok(())
 }
