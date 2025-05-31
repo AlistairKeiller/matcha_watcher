@@ -1,9 +1,9 @@
 mod commands;
 mod config;
 
-use ::serenity::prelude::TypeMapKey;
 use poise::{FrameworkOptions, serenity_prelude as serenity};
 use serenity::all::UserId;
+use serenity::prelude::TypeMapKey;
 use std::{collections::HashSet, env::var, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -53,8 +53,14 @@ async fn main() -> Result<(), Error> {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 {
                     let mut data = ctx.data.write().await;
+                    let subscribers = match tokio::fs::read_to_string("subscribers.json").await {
+                        Ok(content) => {
+                            serde_json::from_str::<HashSet<UserId>>(&content).unwrap_or_default()
+                        }
+                        Err(_) => HashSet::new(),
+                    };
                     data.insert::<Data>(Arc::new(RwLock::new(Data {
-                        subscribers: RwLock::new(HashSet::new()),
+                        subscribers: RwLock::new(subscribers),
                     })));
                 }
                 tokio::spawn(commands::watch_matcha(

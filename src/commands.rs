@@ -1,11 +1,19 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use serenity::all::UserId;
 use tokio::sync::RwLock;
 use tracing::{error, info};
 
 use crate::config::{Matcha, SITES, Site};
 use crate::{Context, Data, Error};
+
+async fn write_subscribers(subscribers: HashSet<UserId>) {
+    let serialized = serde_json::to_string(&subscribers).expect("Failed to serialize subscribers");
+    if let Err(e) = tokio::fs::write("subscribers.json", serialized).await {
+        error!("Failed to write subscribers to file: {}", e);
+    }
+}
 
 #[poise::command(slash_command)]
 pub async fn subscribe(ctx: Context<'_>) -> Result<(), Error> {
@@ -19,6 +27,7 @@ pub async fn subscribe(ctx: Context<'_>) -> Result<(), Error> {
         ctx.say("You are already subscribed.").await?;
     } else {
         ctx.data().subscribers.write().await.insert(ctx.author().id);
+        write_subscribers(ctx.data().subscribers.read().await.clone()).await;
         ctx.say("You are now subscribed.").await?;
     }
     Ok(())
@@ -38,6 +47,7 @@ pub async fn unsubscribe(ctx: Context<'_>) -> Result<(), Error> {
             .write()
             .await
             .remove(&ctx.author().id);
+        write_subscribers(ctx.data().subscribers.read().await.clone()).await;
         ctx.say("You have been unsubscribed.").await?;
     } else {
         ctx.say("You are not currently subscribed.").await?;

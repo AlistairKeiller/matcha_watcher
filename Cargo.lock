@@ -1172,6 +1172,7 @@ dependencies = [
  "poise",
  "reqwest 0.12.18",
  "scraper",
+ "serde_json",
  "serenity",
  "tokio",
  "tracing",
