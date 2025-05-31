@@ -7,6 +7,7 @@ use tracing::{error, info};
 
 use crate::config::{Matcha, SITES, Site};
 use crate::{Context, Data, Error};
+use tokio::time::{Duration, sleep};
 
 async fn write_subscribers(subscribers: HashSet<UserId>) {
     let serialized = serde_json::to_string(&subscribers).expect("Failed to serialize subscribers");
@@ -146,5 +147,6 @@ pub async fn watch_matcha(ctx: serenity::all::Context, data: Arc<RwLock<Data>>) 
                 }
             }
         }
+        sleep(Duration::from_secs(1)).await;
     }
 }
