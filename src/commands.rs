@@ -119,14 +119,17 @@ pub async fn watch_matcha(ctx: serenity::all::Context, data: Arc<RwLock<Data>>) 
             if added.clone().next().is_some() {
                 product_message.push_str(&format!(
                     "🟢 Now in stock: {}\n",
-                    added.map(|p| p.name.clone()).collect::<Vec<_>>().join(", ")
+                    added
+                        .map(|p| format!("[{}]({})", p.name, p.url))
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ));
             }
             if removed.clone().next().is_some() {
                 product_message.push_str(&format!(
                     "🔴 Out of stock: {}\n",
                     removed
-                        .map(|p| p.name.clone())
+                        .map(|p| format!("[{}]({})", p.name, p.url))
                         .collect::<Vec<_>>()
                         .join(", ")
                 ));
