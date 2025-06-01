@@ -18,7 +18,7 @@ pub struct Matcha {
     pub url: String,
 }
 
-pub static SITES: LazyLock<[Site; 2]> = LazyLock::new(|| {
+pub static SITES: LazyLock<[Site; 3]> = LazyLock::new(|| {
     [
         Site {
             url: "https://global.ippodo-tea.co.jp/collections/matcha",
@@ -31,6 +31,15 @@ pub static SITES: LazyLock<[Site; 2]> = LazyLock::new(|| {
         },
         Site {
             url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/matcha",
+            product_card_selector: Selector::parse("li.instock").unwrap(),
+            out_of_stock_filter: None,
+            name_selector: Selector::parse(".product-name h4").unwrap(),
+            href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
+            base_url: "",
+            matchas_in_stock: RwLock::new(HashSet::new()),
+        },
+        Site {
+            url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/sweets",
             product_card_selector: Selector::parse("li.instock").unwrap(),
             out_of_stock_filter: None,
             name_selector: Selector::parse(".product-name h4").unwrap(),
