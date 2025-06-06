@@ -9,8 +9,8 @@ use crate::{Context, Data, Error};
 use tokio::time::{Duration, sleep};
 
 async fn write_subscribers(ctx: &Context<'_>) {
-    let serialized = serde_json::to_string(&*ctx.data().subscribers.read().await)
-        .expect("Failed to serialize subscribers");
+    let serialized =
+        serde_json::to_string(&ctx.data().subscribers).expect("Failed to serialize subscribers");
     if let Err(e) = tokio::fs::write("subscribers.json", serialized).await {
         error!("Failed to write subscribers to file: {}", e);
     }
@@ -18,16 +18,10 @@ async fn write_subscribers(ctx: &Context<'_>) {
 
 #[poise::command(slash_command)]
 pub async fn subscribe(ctx: Context<'_>) -> Result<(), Error> {
-    if ctx
-        .data()
-        .subscribers
-        .read()
-        .await
-        .contains(&ctx.author().id)
-    {
+    if ctx.data().subscribers.contains(&ctx.author().id) {
         ctx.say("You are already subscribed.").await?;
     } else {
-        ctx.data().subscribers.write().await.insert(ctx.author().id);
+        ctx.data().subscribers.insert(ctx.author().id);
         write_subscribers(&ctx).await;
         ctx.say("You are now subscribed.").await?;
     }
@@ -36,18 +30,8 @@ pub async fn subscribe(ctx: Context<'_>) -> Result<(), Error> {
 
 #[poise::command(slash_command)]
 pub async fn unsubscribe(ctx: Context<'_>) -> Result<(), Error> {
-    if ctx
-        .data()
-        .subscribers
-        .read()
-        .await
-        .contains(&ctx.author().id)
-    {
-        ctx.data()
-            .subscribers
-            .write()
-            .await
-            .remove(&ctx.author().id);
+    if ctx.data().subscribers.contains(&ctx.author().id) {
+        ctx.data().subscribers.remove(&ctx.author().id);
         write_subscribers(&ctx).await;
         ctx.say("You have been unsubscribed.").await?;
     } else {
@@ -134,17 +118,17 @@ pub async fn watch_matcha(ctx: serenity::all::Context, data: Arc<RwLock<Data>>) 
                 }
             }
             *site.matchas_in_stock.write().await = products;
-            for user in data.read().await.subscribers.read().await.iter() {
+            for user in data.read().await.subscribers.iter() {
                 let channel = match user.create_dm_channel(&ctx).await {
                     Ok(channel) => channel,
                     Err(e) => {
-                        error!("Failed to get DM channel for user {}: {}", user, e);
+                        error!("Failed to get DM channel for user {}: {}", user.key(), e);
                         continue;
                     }
                 };
 
                 if let Err(e) = channel.say(&ctx, &product_message).await {
-                    error!("Failed to send message to user {}: {}", user, e);
+                    error!("Failed to send message to user {}: {}", user.key(), e);
                 }
             }
         }
