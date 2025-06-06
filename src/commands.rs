@@ -147,26 +147,32 @@ pub async fn watch_matcha(ctx: serenity::all::Context, subscribers: Arc<DashSet<
             }
 
             let mut product_message = String::new();
-            let added = products.difference(&site.matchas_in_stock);
-            let removed = site.matchas_in_stock.difference(&products);
+            let added: Vec<_> = products.difference(&site.matchas_in_stock).collect();
+            let removed: Vec<_> = site.matchas_in_stock.difference(&products).collect();
             info!(
                 "Changes detected for site {}. Added: {:?}, Removed: {:?}",
                 site.url, added, removed
             );
 
-            let added = added
-                .map(|p| format!("[{}]({})", p.name, p.url))
-                .collect::<Vec<String>>()
-                .join(", ");
             if !added.is_empty() {
-                product_message.push_str(&format!("🟢 Now in stock: {}\n", added));
+                product_message.push_str(&format!(
+                    "🟢 Now in stock: {}\n",
+                    added
+                        .iter()
+                        .map(|p| format!("[{}]({})", p.name, p.url))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                ));
             }
-            let removed = removed
-                .map(|p| format!("[{}]({})", p.name, p.url))
-                .collect::<Vec<String>>()
-                .join(", ");
             if !removed.is_empty() {
-                product_message.push_str(&format!("🔴 Out of stock: {}\n", removed));
+                product_message.push_str(&format!(
+                    "🔴 Out of stock: {}\n",
+                    removed
+                        .iter()
+                        .map(|p| format!("[{}]({})", p.name, p.url))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                ));
             }
 
             site.matchas_in_stock = products;

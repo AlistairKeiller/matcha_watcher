@@ -15,7 +15,9 @@ pub struct Data {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::WARN)
+        .init();
 
     let options: FrameworkOptions<Data, Error> = poise::FrameworkOptions {
         commands: vec![commands::subscribe(), commands::unsubscribe()],
