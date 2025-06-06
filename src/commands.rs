@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use serenity::all::UserId;
 use tokio::sync::RwLock;
 use tracing::{error, info};
 
@@ -9,8 +8,9 @@ use crate::config::{Matcha, SITES, Site};
 use crate::{Context, Data, Error};
 use tokio::time::{Duration, sleep};
 
-async fn write_subscribers(subscribers: HashSet<UserId>) {
-    let serialized = serde_json::to_string(&subscribers).expect("Failed to serialize subscribers");
+async fn write_subscribers(ctx: &Context<'_>) {
+    let serialized = serde_json::to_string(&*ctx.data().subscribers.read().await)
+        .expect("Failed to serialize subscribers");
     if let Err(e) = tokio::fs::write("subscribers.json", serialized).await {
         error!("Failed to write subscribers to file: {}", e);
     }
@@ -28,7 +28,7 @@ pub async fn subscribe(ctx: Context<'_>) -> Result<(), Error> {
         ctx.say("You are already subscribed.").await?;
     } else {
         ctx.data().subscribers.write().await.insert(ctx.author().id);
-        write_subscribers(ctx.data().subscribers.read().await.clone()).await;
+        write_subscribers(&ctx).await;
         ctx.say("You are now subscribed.").await?;
     }
     Ok(())
@@ -48,7 +48,7 @@ pub async fn unsubscribe(ctx: Context<'_>) -> Result<(), Error> {
             .write()
             .await
             .remove(&ctx.author().id);
-        write_subscribers(ctx.data().subscribers.read().await.clone()).await;
+        write_subscribers(&ctx).await;
         ctx.say("You have been unsubscribed.").await?;
     } else {
         ctx.say("You are not currently subscribed.").await?;
@@ -104,45 +104,46 @@ pub async fn watch_matcha(ctx: serenity::all::Context, data: Arc<RwLock<Data>>) 
                     continue;
                 }
             };
-            if products == *site.matchas_in_stock.read().await {
-                info!("No changes found on site {}", site.url);
-                continue;
-            }
-            let matchas_in_stock = site.matchas_in_stock.read().await.clone();
-            let added = products.difference(&matchas_in_stock);
-            let removed = matchas_in_stock.difference(&products);
-            *site.matchas_in_stock.write().await = products.clone();
-            info!(
-                "Changes detected for site {}. Added: {:?}, Removed: {:?}",
-                site.url, added, removed
-            );
+
             let mut product_message = String::new();
-            if added.clone().next().is_some() {
-                product_message.push_str(&format!(
-                    "🟢 Now in stock: {}\n",
-                    added
-                        .map(|p| format!("[{}]({})", p.name, p.url))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
+            {
+                let matchas_in_stock = site.matchas_in_stock.read().await;
+                if products == *matchas_in_stock {
+                    info!("No changes found on site {}", site.url);
+                    continue;
+                }
+                let added = products.difference(&matchas_in_stock);
+                let removed = matchas_in_stock.difference(&products);
+                info!(
+                    "Changes detected for site {}. Added: {:?}, Removed: {:?}",
+                    site.url, added, removed
+                );
+                let added = added
+                    .map(|p| format!("[{}]({})", p.name, p.url))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                if !added.is_empty() {
+                    product_message.push_str(&format!("🟢 Now in stock: {}\n", added));
+                }
+                let removed = removed
+                    .map(|p| format!("[{}]({})", p.name, p.url))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                if !removed.is_empty() {
+                    product_message.push_str(&format!("🔴 Out of stock: {}\n", removed));
+                }
             }
-            if removed.clone().next().is_some() {
-                product_message.push_str(&format!(
-                    "🔴 Out of stock: {}\n",
-                    removed
-                        .map(|p| format!("[{}]({})", p.name, p.url))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ));
-            }
+            *site.matchas_in_stock.write().await = products;
             for user in data.read().await.subscribers.read().await.iter() {
-                if let Err(e) = user
-                    .create_dm_channel(&ctx)
-                    .await
-                    .unwrap()
-                    .say(&ctx, product_message.clone())
-                    .await
-                {
+                let channel = match user.create_dm_channel(&ctx).await {
+                    Ok(channel) => channel,
+                    Err(e) => {
+                        error!("Failed to get DM channel for user {}: {}", user, e);
+                        continue;
+                    }
+                };
+
+                if let Err(e) = channel.say(&ctx, &product_message).await {
                     error!("Failed to send message to user {}: {}", user, e);
                 }
             }
