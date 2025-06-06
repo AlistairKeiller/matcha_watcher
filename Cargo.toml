@@ -2,6 +2,7 @@
 name = "matcha_watcher"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/AlistairKeiller/matcha_watcher"
 
 [dependencies]
 dashmap = { version = "6.1.0", features = ["serde"] }
@@ -21,3 +22,8 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", default-features = false, features = [
     "fmt",
 ] }
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
