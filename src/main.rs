@@ -94,6 +94,15 @@ async fn main() -> Result<(), Error> {
                         base_url: "",
                         matchas_in_stock: HashSet::new(),
                     },
+                    Site {
+                        url: "https://www.sazentea.com/en/products/c22-ceremonial-grade-matcha",
+                        product_card_selector: Selector::parse("div.product").unwrap(),
+                        out_of_stock_filter: Some(Selector::parse("div.bestseller").unwrap()),
+                        name_selector: Selector::parse(".product-name a").unwrap(),
+                        href_selector: Selector::parse(".product-name a").unwrap(),
+                        base_url: "https://www.sazentea.com",
+                        matchas_in_stock: HashSet::new(),
+                    }
                 ];
                 for site in sites {
                     tokio::spawn(commands::watch_matcha(ctx.clone(), subscribers.clone(), site));
