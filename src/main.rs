@@ -73,8 +73,7 @@ async fn main() -> Result<(), Error> {
                 let sites = [
                     Site {
                         url: "https://global.ippodo-tea.co.jp/collections/matcha",
-                        product_card_selector: Selector::parse("li.m-product-card").unwrap(),
-                        out_of_stock_filter: Some(Selector::parse("button.out-of-stock").unwrap()),
+                        product_card_selector: Selector::parse("li.m-product-card:not(:has(button.out-of-stock))").unwrap(),
                         name_selector: Selector::parse(".m-product-card__name a").unwrap(),
                         href_selector: Selector::parse(".m-product-card__name a").unwrap(),
                         base_url: "https://global.ippodo-tea.co.jp",
@@ -83,7 +82,6 @@ async fn main() -> Result<(), Error> {
                     Site {
                         url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/matcha",
                         product_card_selector: Selector::parse("li.instock").unwrap(),
-                        out_of_stock_filter: None,
                         name_selector: Selector::parse(".product-name h4").unwrap(),
                         href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
                         base_url: "",
@@ -92,7 +90,6 @@ async fn main() -> Result<(), Error> {
                     Site {
                         url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/sweets",
                         product_card_selector: Selector::parse("li.instock").unwrap(),
-                        out_of_stock_filter: None,
                         name_selector: Selector::parse(".product-name h4").unwrap(),
                         href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
                         base_url: "",
@@ -101,7 +98,6 @@ async fn main() -> Result<(), Error> {
                     Site {
                         url: "https://www.sazentea.com/en/products/c22-ceremonial-grade-matcha",
                         product_card_selector: Selector::parse("div.product").unwrap(),
-                        out_of_stock_filter: None,
                         name_selector: Selector::parse(".product-name a").unwrap(),
                         href_selector: Selector::parse(".product-name a").unwrap(),
                         base_url: "https://www.sazentea.com",

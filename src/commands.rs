@@ -12,7 +12,6 @@ use tokio::time::{Duration, sleep};
 pub struct Site {
     pub url: &'static str,
     pub product_card_selector: Selector,
-    pub out_of_stock_filter: Option<Selector>,
     pub name_selector: Selector,
     pub href_selector: Selector,
     pub base_url: &'static str,
@@ -73,13 +72,7 @@ pub async fn fetch_products(site: &Site) -> Result<HashSet<Matcha>, Error> {
         .await?
         .error_for_status()?;
     let document = scraper::Html::parse_document(&res.text().await?);
-    let product_cards = document
-        .select(&site.product_card_selector)
-        .filter(|element| {
-            site.out_of_stock_filter
-                .as_ref()
-                .is_none_or(|filter| element.select(filter).next().is_none())
-        });
+    let product_cards = document.select(&site.product_card_selector);
     let mut products = HashSet::new();
     for product_card in product_cards {
         let url = site.base_url.to_string()
