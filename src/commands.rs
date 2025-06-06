@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use dashmap::DashSet;
+use poise::serenity_prelude as serenity;
 use scraper::Selector;
-use serenity::all::UserId;
 use tracing::{error, info};
 
 use crate::{Context, Error};
@@ -99,7 +99,10 @@ pub async fn fetch_products(site: &Site) -> Result<HashSet<Matcha>, Error> {
     Ok(products)
 }
 
-pub async fn watch_matcha(ctx: serenity::all::Context, subscribers: Arc<DashSet<UserId>>) {
+pub async fn watch_matcha(
+    ctx: serenity::all::Context,
+    subscribers: Arc<DashSet<serenity::UserId>>,
+) {
     let mut sites = [
         Site {
             url: "https://global.ippodo-tea.co.jp/collections/matcha",

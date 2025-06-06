@@ -7,6 +7,8 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+read -p "Enter your Discord token: " DISCORD_TOKEN
+
 cat <<EOF > "$SERVICE_FILE"
 [Unit]
 Description=matcha_watcher Service
@@ -16,6 +18,7 @@ After=network.target
 Type=simple
 User=alistair
 WorkingDirectory=/home/alistair/matcha_watcher
+Environment="DISCORD_TOKEN=$DISCORD_TOKEN"
 ExecStart=/home/alistair/matcha_watcher/target/release/matcha_watcher
 Restart=on-failure
 

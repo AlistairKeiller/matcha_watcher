@@ -2,7 +2,6 @@ mod commands;
 
 use dashmap::DashSet;
 use poise::{FrameworkOptions, serenity_prelude as serenity};
-use serenity::all::UserId;
 use std::{env::var, sync::Arc};
 use tracing::{error, info};
 
@@ -10,7 +9,7 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
-    subscribers: Arc<DashSet<UserId>>,
+    subscribers: Arc<DashSet<serenity::UserId>>,
 }
 
 #[tokio::main]
@@ -48,15 +47,17 @@ async fn main() -> Result<(), Error> {
             Box::pin(async move {
                 info!("Logged in as {}", _ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                let subscribers: Arc<DashSet<UserId>> =
+                let subscribers: Arc<DashSet<serenity::UserId>> =
                     Arc::new(match tokio::fs::read_to_string("subscribers.json").await {
-                        Ok(content) => match serde_json::from_str::<DashSet<UserId>>(&content) {
-                            Ok(subscribers) => subscribers,
-                            Err(e) => {
-                                error!("Failed to parse subscribers.json: {}", e);
-                                DashSet::new()
+                        Ok(content) => {
+                            match serde_json::from_str::<DashSet<serenity::UserId>>(&content) {
+                                Ok(subscribers) => subscribers,
+                                Err(e) => {
+                                    error!("Failed to parse subscribers.json: {}", e);
+                                    DashSet::new()
+                                }
                             }
-                        },
+                        }
                         Err(e) => {
                             error!("Failed to read subscribers.json: {}", e);
                             DashSet::new()
@@ -71,7 +72,6 @@ async fn main() -> Result<(), Error> {
         .options(options)
         .build();
 
-    dotenv::dotenv().ok();
     let token =
         var("DISCORD_TOKEN").map_err(|e| format!("Missing `DISCORD_TOKEN` env var: {}", e))?;
     let intents = serenity::GatewayIntents::non_privileged();
