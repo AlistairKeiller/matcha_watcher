@@ -18,7 +18,11 @@ pub struct Data {
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::WARN)
+        .with_max_level(if cfg!(debug_assertions) {
+            tracing::Level::DEBUG
+        } else {
+            tracing::Level::WARN
+        })
         .init();
 
     let options: FrameworkOptions<Data, Error> = poise::FrameworkOptions {
