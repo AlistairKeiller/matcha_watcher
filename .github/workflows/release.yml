@@ -1,26 +1,28 @@
-name: Build
+name: Release
+
+permissions:
+  contents: write
 
 on:
   push:
-    branches: [master]
+    tags:
+      - v[0-9]+.*
 
 jobs:
-  build:
-    name: Build
+  create-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@master
-      - name: Compile
-        id: compile
-        uses: rust-build/rust-build.action@v1.4.5
+      - uses: actions/checkout@v4
+      - uses: taiki-e/create-gh-release-action@v1
         with:
-          RUSTTARGET: x86_64-unknown-linux-musl
-          UPLOAD_MODE: none
-          TOOLCHAIN_VERSION: stable
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-assets:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/upload-rust-binary-action@v1
         with:
-          name: Binary
-          path: |
-            ${{ steps.compile.outputs.BUILT_ARCHIVE }}
-            ${{ steps.compile.outputs.BUILT_CHECKSUM }}
+          bin: matcha_watcher
+          token: ${{ secrets.GITHUB_TOKEN }}
