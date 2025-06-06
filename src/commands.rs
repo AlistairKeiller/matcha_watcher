@@ -2,12 +2,28 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use dashmap::DashSet;
+use scraper::Selector;
 use serenity::all::UserId;
 use tracing::{error, info};
 
-use crate::config::{Matcha, SITES, Site};
 use crate::{Context, Error};
 use tokio::time::{Duration, sleep};
+
+pub struct Site {
+    pub url: &'static str,
+    pub product_card_selector: Selector,
+    pub out_of_stock_filter: Option<Selector>,
+    pub name_selector: Selector,
+    pub href_selector: Selector,
+    pub base_url: &'static str,
+    pub matchas_in_stock: HashSet<Matcha>,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct Matcha {
+    pub name: String,
+    pub url: String,
+}
 
 async fn write_subscribers(ctx: &Context<'_>) {
     let serialized = match serde_json::to_string(&*ctx.data().subscribers) {
@@ -84,10 +100,40 @@ pub async fn fetch_products(site: &Site) -> Result<HashSet<Matcha>, Error> {
 }
 
 pub async fn watch_matcha(ctx: serenity::all::Context, subscribers: Arc<DashSet<UserId>>) {
+    let mut sites = [
+        Site {
+            url: "https://global.ippodo-tea.co.jp/collections/matcha",
+            product_card_selector: Selector::parse("li.m-product-card").unwrap(),
+            out_of_stock_filter: Some(Selector::parse("button.out-of-stock").unwrap()),
+            name_selector: Selector::parse(".m-product-card__name a").unwrap(),
+            href_selector: Selector::parse(".m-product-card__name a").unwrap(),
+            base_url: "https://global.ippodo-tea.co.jp",
+            matchas_in_stock: HashSet::new(),
+        },
+        Site {
+            url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/matcha",
+            product_card_selector: Selector::parse("li.instock").unwrap(),
+            out_of_stock_filter: None,
+            name_selector: Selector::parse(".product-name h4").unwrap(),
+            href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
+            base_url: "",
+            matchas_in_stock: HashSet::new(),
+        },
+        Site {
+            url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/sweets",
+            product_card_selector: Selector::parse("li.instock").unwrap(),
+            out_of_stock_filter: None,
+            name_selector: Selector::parse(".product-name h4").unwrap(),
+            href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
+            base_url: "",
+            matchas_in_stock: HashSet::new(),
+        },
+    ];
     loop {
-        for site in SITES.iter() {
+        for site in sites.iter_mut() {
             info!("checking site {}", site.url);
-            let products = match fetch_products(site).await {
+
+            let products = match fetch_products(&site).await {
                 Ok(products) => products,
                 Err(e) => {
                     error!("Error checking site {}: {}", site.url, e);
@@ -95,35 +141,35 @@ pub async fn watch_matcha(ctx: serenity::all::Context, subscribers: Arc<DashSet<
                 }
             };
 
-            let mut product_message = String::new();
-            {
-                let matchas_in_stock = site.matchas_in_stock.read().await;
-                if products == *matchas_in_stock {
-                    info!("No changes found on site {}", site.url);
-                    continue;
-                }
-                let added = products.difference(&matchas_in_stock);
-                let removed = matchas_in_stock.difference(&products);
-                info!(
-                    "Changes detected for site {}. Added: {:?}, Removed: {:?}",
-                    site.url, added, removed
-                );
-                let added = added
-                    .map(|p| format!("[{}]({})", p.name, p.url))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                if !added.is_empty() {
-                    product_message.push_str(&format!("🟢 Now in stock: {}\n", added));
-                }
-                let removed = removed
-                    .map(|p| format!("[{}]({})", p.name, p.url))
-                    .collect::<Vec<String>>()
-                    .join(", ");
-                if !removed.is_empty() {
-                    product_message.push_str(&format!("🔴 Out of stock: {}\n", removed));
-                }
+            if products == site.matchas_in_stock {
+                info!("No changes found on site {}", site.url);
+                continue;
             }
-            *site.matchas_in_stock.write().await = products;
+
+            let mut product_message = String::new();
+            let added = products.difference(&site.matchas_in_stock);
+            let removed = site.matchas_in_stock.difference(&products);
+            info!(
+                "Changes detected for site {}. Added: {:?}, Removed: {:?}",
+                site.url, added, removed
+            );
+
+            let added = added
+                .map(|p| format!("[{}]({})", p.name, p.url))
+                .collect::<Vec<String>>()
+                .join(", ");
+            if !added.is_empty() {
+                product_message.push_str(&format!("🟢 Now in stock: {}\n", added));
+            }
+            let removed = removed
+                .map(|p| format!("[{}]({})", p.name, p.url))
+                .collect::<Vec<String>>()
+                .join(", ");
+            if !removed.is_empty() {
+                product_message.push_str(&format!("🔴 Out of stock: {}\n", removed));
+            }
+
+            site.matchas_in_stock = products;
             for user in subscribers.iter() {
                 let channel = match user.create_dm_channel(&ctx).await {
                     Ok(channel) => channel,

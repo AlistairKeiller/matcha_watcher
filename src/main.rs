@@ -1,5 +1,4 @@
 mod commands;
-mod config;
 
 use dashmap::DashSet;
 use poise::{FrameworkOptions, serenity_prelude as serenity};
@@ -48,19 +47,19 @@ async fn main() -> Result<(), Error> {
                 info!("Logged in as {}", _ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 let subscribers: Arc<DashSet<UserId>> =
-                    match tokio::fs::read_to_string("subscribers.json").await {
+                    Arc::new(match tokio::fs::read_to_string("subscribers.json").await {
                         Ok(content) => match serde_json::from_str::<DashSet<UserId>>(&content) {
-                            Ok(subscribers) => Arc::new(subscribers),
+                            Ok(subscribers) => subscribers,
                             Err(e) => {
                                 error!("Failed to parse subscribers.json: {}", e);
-                                Arc::new(DashSet::new())
+                                DashSet::new()
                             }
                         },
                         Err(e) => {
                             error!("Failed to read subscribers.json: {}", e);
-                            Arc::new(DashSet::new())
+                            DashSet::new()
                         }
-                    };
+                    });
                 tokio::spawn(commands::watch_matcha(ctx.clone(), subscribers.clone()));
                 Ok(Data {
                     subscribers: subscribers.clone(),
