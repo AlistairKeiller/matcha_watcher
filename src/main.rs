@@ -2,8 +2,11 @@ mod commands;
 
 use dashmap::DashSet;
 use poise::{FrameworkOptions, serenity_prelude as serenity};
-use std::{env::var, sync::Arc};
+use scraper::Selector;
+use std::{collections::HashSet, env::var, sync::Arc};
 use tracing::{error, info};
+
+use crate::commands::Site;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -63,7 +66,38 @@ async fn main() -> Result<(), Error> {
                             DashSet::new()
                         }
                     });
-                tokio::spawn(commands::watch_matcha(ctx.clone(), subscribers.clone()));
+                let sites = [
+                    Site {
+                        url: "https://global.ippodo-tea.co.jp/collections/matcha",
+                        product_card_selector: Selector::parse("li.m-product-card").unwrap(),
+                        out_of_stock_filter: Some(Selector::parse("button.out-of-stock").unwrap()),
+                        name_selector: Selector::parse(".m-product-card__name a").unwrap(),
+                        href_selector: Selector::parse(".m-product-card__name a").unwrap(),
+                        base_url: "https://global.ippodo-tea.co.jp",
+                        matchas_in_stock: HashSet::new(),
+                    },
+                    Site {
+                        url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/matcha",
+                        product_card_selector: Selector::parse("li.instock").unwrap(),
+                        out_of_stock_filter: None,
+                        name_selector: Selector::parse(".product-name h4").unwrap(),
+                        href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
+                        base_url: "",
+                        matchas_in_stock: HashSet::new(),
+                    },
+                    Site {
+                        url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/sweets",
+                        product_card_selector: Selector::parse("li.instock").unwrap(),
+                        out_of_stock_filter: None,
+                        name_selector: Selector::parse(".product-name h4").unwrap(),
+                        href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
+                        base_url: "",
+                        matchas_in_stock: HashSet::new(),
+                    },
+                ];
+                for site in sites {
+                    tokio::spawn(commands::watch_matcha(ctx.clone(), subscribers.clone(), site));
+                }
                 Ok(Data {
                     subscribers: subscribers.clone(),
                 })

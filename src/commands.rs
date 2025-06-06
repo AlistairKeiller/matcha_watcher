@@ -102,97 +102,67 @@ pub async fn fetch_products(site: &Site) -> Result<HashSet<Matcha>, Error> {
 pub async fn watch_matcha(
     ctx: serenity::all::Context,
     subscribers: Arc<DashSet<serenity::UserId>>,
+    mut site: Site,
 ) {
-    let mut sites = [
-        Site {
-            url: "https://global.ippodo-tea.co.jp/collections/matcha",
-            product_card_selector: Selector::parse("li.m-product-card").unwrap(),
-            out_of_stock_filter: Some(Selector::parse("button.out-of-stock").unwrap()),
-            name_selector: Selector::parse(".m-product-card__name a").unwrap(),
-            href_selector: Selector::parse(".m-product-card__name a").unwrap(),
-            base_url: "https://global.ippodo-tea.co.jp",
-            matchas_in_stock: HashSet::new(),
-        },
-        Site {
-            url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/matcha",
-            product_card_selector: Selector::parse("li.instock").unwrap(),
-            out_of_stock_filter: None,
-            name_selector: Selector::parse(".product-name h4").unwrap(),
-            href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
-            base_url: "",
-            matchas_in_stock: HashSet::new(),
-        },
-        Site {
-            url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/sweets",
-            product_card_selector: Selector::parse("li.instock").unwrap(),
-            out_of_stock_filter: None,
-            name_selector: Selector::parse(".product-name h4").unwrap(),
-            href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
-            base_url: "",
-            matchas_in_stock: HashSet::new(),
-        },
-    ];
     loop {
-        for site in sites.iter_mut() {
-            info!("checking site {}", site.url);
+        info!("checking site {}", site.url);
 
-            let products = match fetch_products(&site).await {
-                Ok(products) => products,
+        let products = match fetch_products(&site).await {
+            Ok(products) => products,
+            Err(e) => {
+                error!("Error checking site {}: {}", site.url, e);
+                continue;
+            }
+        };
+
+        if products == site.matchas_in_stock {
+            info!("No changes found on site {}", site.url);
+            continue;
+        }
+
+        let mut product_message = String::new();
+        let added: Vec<_> = products.difference(&site.matchas_in_stock).collect();
+        let removed: Vec<_> = site.matchas_in_stock.difference(&products).collect();
+        info!(
+            "Changes detected for site {}. Added: {:?}, Removed: {:?}",
+            site.url, added, removed
+        );
+
+        if !added.is_empty() {
+            product_message.push_str(&format!(
+                "🟢 Now in stock: {}\n",
+                added
+                    .iter()
+                    .map(|p| format!("[{}]({})", p.name, p.url))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ));
+        }
+        if !removed.is_empty() {
+            product_message.push_str(&format!(
+                "🔴 Out of stock: {}\n",
+                removed
+                    .iter()
+                    .map(|p| format!("[{}]({})", p.name, p.url))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ));
+        }
+
+        site.matchas_in_stock = products;
+        for user in subscribers.iter() {
+            let channel = match user.create_dm_channel(&ctx).await {
+                Ok(channel) => channel,
                 Err(e) => {
-                    error!("Error checking site {}: {}", site.url, e);
+                    error!("Failed to get DM channel for user {}: {}", user.key(), e);
                     continue;
                 }
             };
 
-            if products == site.matchas_in_stock {
-                info!("No changes found on site {}", site.url);
-                continue;
-            }
-
-            let mut product_message = String::new();
-            let added: Vec<_> = products.difference(&site.matchas_in_stock).collect();
-            let removed: Vec<_> = site.matchas_in_stock.difference(&products).collect();
-            info!(
-                "Changes detected for site {}. Added: {:?}, Removed: {:?}",
-                site.url, added, removed
-            );
-
-            if !added.is_empty() {
-                product_message.push_str(&format!(
-                    "🟢 Now in stock: {}\n",
-                    added
-                        .iter()
-                        .map(|p| format!("[{}]({})", p.name, p.url))
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                ));
-            }
-            if !removed.is_empty() {
-                product_message.push_str(&format!(
-                    "🔴 Out of stock: {}\n",
-                    removed
-                        .iter()
-                        .map(|p| format!("[{}]({})", p.name, p.url))
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                ));
-            }
-
-            site.matchas_in_stock = products;
-            for user in subscribers.iter() {
-                let channel = match user.create_dm_channel(&ctx).await {
-                    Ok(channel) => channel,
-                    Err(e) => {
-                        error!("Failed to get DM channel for user {}: {}", user.key(), e);
-                        continue;
-                    }
-                };
-
-                if let Err(e) = channel.say(&ctx, &product_message).await {
-                    error!("Failed to send message to user {}: {}", user.key(), e);
-                }
+            if let Err(e) = channel.say(&ctx, &product_message).await {
+                error!("Failed to send message to user {}: {}", user.key(), e);
             }
         }
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(5)).await;
     }
 }
