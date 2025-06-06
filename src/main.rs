@@ -4,20 +4,14 @@ mod config;
 use dashmap::DashSet;
 use poise::{FrameworkOptions, serenity_prelude as serenity};
 use serenity::all::UserId;
-use serenity::prelude::TypeMapKey;
 use std::{env::var, sync::Arc};
-use tokio::sync::RwLock;
 use tracing::{error, info};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
-    subscribers: DashSet<UserId>,
-}
-
-impl TypeMapKey for Data {
-    type Value = Arc<RwLock<Data>>;
+    subscribers: Arc<DashSet<UserId>>,
 }
 
 #[tokio::main]
@@ -53,37 +47,23 @@ async fn main() -> Result<(), Error> {
             Box::pin(async move {
                 info!("Logged in as {}", _ready.user.name);
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                let subscribers = match tokio::fs::read_to_string("subscribers.json").await {
-                    Ok(content) => match serde_json::from_str::<DashSet<UserId>>(&content) {
-                        Ok(subscribers) => subscribers,
+                let subscribers: Arc<DashSet<UserId>> =
+                    match tokio::fs::read_to_string("subscribers.json").await {
+                        Ok(content) => match serde_json::from_str::<DashSet<UserId>>(&content) {
+                            Ok(subscribers) => Arc::new(subscribers),
+                            Err(e) => {
+                                error!("Failed to parse subscribers.json: {}", e);
+                                Arc::new(DashSet::new())
+                            }
+                        },
                         Err(e) => {
-                            error!("Failed to parse subscribers.json: {}", e);
-                            DashSet::new()
+                            error!("Failed to read subscribers.json: {}", e);
+                            Arc::new(DashSet::new())
                         }
-                    },
-                    Err(e) => {
-                        error!("Failed to read subscribers.json: {}", e);
-                        DashSet::new()
-                    }
-                };
-                ctx.data
-                    .write()
-                    .await
-                    .insert::<Data>(Arc::new(RwLock::new(Data {
-                        subscribers: subscribers,
-                    })));
-                tokio::spawn(commands::watch_matcha(
-                    ctx.clone(),
-                    match ctx.data.read().await.get::<Data>() {
-                        Some(data) => data.clone(),
-                        None => {
-                            error!("Failed to retrieve Data from TypeMap");
-                            return Err("Failed to retrieve Data".into());
-                        }
-                    },
-                ));
+                    };
+                tokio::spawn(commands::watch_matcha(ctx.clone(), subscribers.clone()));
                 Ok(Data {
-                    subscribers: DashSet::new(),
+                    subscribers: subscribers.clone(),
                 })
             })
         })

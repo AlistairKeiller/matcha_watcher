@@ -1,16 +1,22 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
+use dashmap::DashSet;
+use serenity::all::UserId;
 use tracing::{error, info};
 
 use crate::config::{Matcha, SITES, Site};
-use crate::{Context, Data, Error};
+use crate::{Context, Error};
 use tokio::time::{Duration, sleep};
 
 async fn write_subscribers(ctx: &Context<'_>) {
-    let serialized =
-        serde_json::to_string(&ctx.data().subscribers).expect("Failed to serialize subscribers");
+    let serialized = match serde_json::to_string(&*ctx.data().subscribers) {
+        Ok(data) => data,
+        Err(e) => {
+            error!("Failed to serialize subscribers: {}", e);
+            return;
+        }
+    };
     if let Err(e) = tokio::fs::write("subscribers.json", serialized).await {
         error!("Failed to write subscribers to file: {}", e);
     }
@@ -77,7 +83,7 @@ pub async fn fetch_products(site: &Site) -> Result<HashSet<Matcha>, Error> {
     Ok(products)
 }
 
-pub async fn watch_matcha(ctx: serenity::all::Context, data: Arc<RwLock<Data>>) {
+pub async fn watch_matcha(ctx: serenity::all::Context, subscribers: Arc<DashSet<UserId>>) {
     loop {
         for site in SITES.iter() {
             info!("checking site {}", site.url);
@@ -118,7 +124,7 @@ pub async fn watch_matcha(ctx: serenity::all::Context, data: Arc<RwLock<Data>>) 
                 }
             }
             *site.matchas_in_stock.write().await = products;
-            for user in data.read().await.subscribers.iter() {
+            for user in subscribers.iter() {
                 let channel = match user.create_dm_channel(&ctx).await {
                     Ok(channel) => channel,
                     Err(e) => {
