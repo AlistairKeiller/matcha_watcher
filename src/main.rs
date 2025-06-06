@@ -101,7 +101,7 @@ async fn main() -> Result<(), Error> {
                     Site {
                         url: "https://www.sazentea.com/en/products/c22-ceremonial-grade-matcha",
                         product_card_selector: Selector::parse("div.product").unwrap(),
-                        out_of_stock_filter: Some(Selector::parse("div.bestseller").unwrap()),
+                        out_of_stock_filter: None,
                         name_selector: Selector::parse(".product-name a").unwrap(),
                         href_selector: Selector::parse(".product-name a").unwrap(),
                         base_url: "https://www.sazentea.com",
