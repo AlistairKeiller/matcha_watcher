@@ -80,7 +80,15 @@ async fn main() -> Result<(), Error> {
                         matchas_in_stock: HashSet::new(),
                     },
                     Site {
-                        url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/matcha",
+                        url: "https://global.ippodo-tea.co.jp/collections/utensils",
+                        product_card_selector: Selector::parse("li.m-product-card:not(:has(button.out-of-stock))").unwrap(),
+                        name_selector: Selector::parse(".m-product-card__name a").unwrap(),
+                        href_selector: Selector::parse(".m-product-card__name a").unwrap(),
+                        base_url: "https://global.ippodo-tea.co.jp",
+                        matchas_in_stock: HashSet::new(),
+                    },
+                    Site {
+                        url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/matcha?viewall=1",
                         product_card_selector: Selector::parse("li.instock").unwrap(),
                         name_selector: Selector::parse(".product-name h4").unwrap(),
                         href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
@@ -88,7 +96,15 @@ async fn main() -> Result<(), Error> {
                         matchas_in_stock: HashSet::new(),
                     },
                     Site {
-                        url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/sweets",
+                        url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/sweets?viewall=1",
+                        product_card_selector: Selector::parse("li.instock").unwrap(),
+                        name_selector: Selector::parse(".product-name h4").unwrap(),
+                        href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
+                        base_url: "",
+                        matchas_in_stock: HashSet::new(),
+                    },
+                    Site {
+                        url: "https://www.marukyu-koyamaen.co.jp/english/shop/products/catalog/others?viewall=1",
                         product_card_selector: Selector::parse("li.instock").unwrap(),
                         name_selector: Selector::parse(".product-name h4").unwrap(),
                         href_selector: Selector::parse("a.woocommerce-loop-product__link").unwrap(),
